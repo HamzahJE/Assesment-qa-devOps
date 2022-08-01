@@ -3,8 +3,29 @@ const path = require('path')
 const app = express()
 const {bots, playerRecord} = require('./data')
 const {shuffleArray} = require('./utils')
+require('dotenv').config()
 
 app.use(express.json())
+app.use(express.static(path.join(__dirname, "/public")))
+
+// include and initialize the rollbar library with your access token
+var Rollbar = require('rollbar')
+var rollbar = new Rollbar({
+  accessToken: process.env.ROLLBAR_ACCESS_TOKEN,
+  captureUncaught: true,
+  captureUnhandledRejections: true,
+})
+
+// record a generic message and send it to Rollbar
+rollbar.log('Hello world!')
+
+
+app.get('/', function(req,res) {
+    rollbar.log('User is viewing the site')
+    res.sendFile(path.resolve(__dirname, '/public/index.html'))
+    })
+
+
 
 app.get('/api/robots', (req, res) => {
     try {
@@ -21,6 +42,8 @@ app.get('/api/robots/five', (req, res) => {
         let choices = shuffled.slice(0, 5)
         let compDuo = shuffled.slice(6, 8)
         res.status(200).send({choices, compDuo})
+        rollbar.log('User is viewing the five choices')
+
     } catch (error) {
         console.log('ERROR GETTING FIVE BOTS', error)
         res.sendStatus(400)
@@ -31,18 +54,22 @@ app.post('/api/duel', (req, res) => {
     try {
         // getting the duos from the front end
         let {compDuo, playerDuo} = req.body
+        rollbar.warning('User intiated Duel')
 
         // adding up the computer player's total health and attack damage
         let compHealth = compDuo[0].health + compDuo[1].health
         let compAttack = compDuo[0].attacks[0].damage + compDuo[0].attacks[1].damage + compDuo[1].attacks[0].damage + compDuo[1].attacks[1].damage
-        
+        rollbar.warning('calculating computer stats')
+
         // adding up the player's total health and attack damage
         let playerHealth = playerDuo[0].health + playerDuo[1].health
         let playerAttack = playerDuo[0].attacks[0].damage + playerDuo[0].attacks[1].damage + playerDuo[1].attacks[0].damage + playerDuo[1].attacks[1].damage
-        
+        rollbar.warning('calculating player stats')
+
         // calculating how much health is left after the attacks on each other
         let compHealthAfterAttack = compHealth - playerAttack
         let playerHealthAfterAttack = playerHealth - compAttack
+        rollbar.warning('finalizing results')
 
         // comparing the total health to determine a winner
         if (compHealthAfterAttack > playerHealthAfterAttack) {
